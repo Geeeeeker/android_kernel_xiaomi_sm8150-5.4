@@ -3188,13 +3188,19 @@ static int msm_geni_serial_get_irq_pinctrl(struct platform_device *pdev,
 		}
 	}
 	/*
-	 * For clients who setup an Inband wakeup, leave the GPIO pins
-	 * always connected to the core, else move the pins to their
+	 * For clients who setup an Inband wakeup, use the "sleep" state if
+	 * the DT has one (it can park RFR at ready while the core is off, so
+	 * the peer can still send its wake byte), else leave the GPIO pins
+	 * always connected to the core. Other clients move the pins to their
 	 * defined "sleep" state.
 	 */
 	if (dev_port->wakeup_irq > 0) {
 		dev_port->serial_rsc.geni_gpio_sleep =
-			dev_port->serial_rsc.geni_gpio_active;
+			pinctrl_lookup_state(dev_port->serial_rsc.geni_pinctrl,
+							PINCTRL_SLEEP);
+		if (IS_ERR_OR_NULL(dev_port->serial_rsc.geni_gpio_sleep))
+			dev_port->serial_rsc.geni_gpio_sleep =
+				dev_port->serial_rsc.geni_gpio_active;
 	} else {
 		dev_port->serial_rsc.geni_gpio_sleep =
 			pinctrl_lookup_state(dev_port->serial_rsc.geni_pinctrl,
