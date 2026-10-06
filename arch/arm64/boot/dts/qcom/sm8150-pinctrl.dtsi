@@ -310,6 +310,20 @@
 				};
 			};
 
+			qupv3_se13_rts_sleep: qupv3_se13_rts_sleep {
+				mux {
+					pins = "gpio44";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio44";
+					drive-strength = <2>;
+					bias-pull-down;
+					output-low;
+				};
+			};
+
 			qupv3_se13_tx: qupv3_se13_tx {
 				mux {
 					pins = "gpio45";
