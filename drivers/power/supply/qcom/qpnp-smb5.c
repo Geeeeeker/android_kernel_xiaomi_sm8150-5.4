@@ -1289,8 +1289,6 @@ static int smb5_psy_iio_channel(enum power_supply_property psp)
 		return PSY_IIO_DIE_HEALTH;
 	case POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE:
 		return PSY_IIO_FCC_STEPPER_ENABLE;
-	case POWER_SUPPLY_PROP_INPUT_CURRENT_NOW:
-		return PSY_IIO_INPUT_CURRENT_NOW;
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED:
 		return PSY_IIO_MAIN_INPUT_CURRENT_SETTLED;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
@@ -1337,7 +1335,6 @@ static enum power_supply_property smb5_usb_props[] = {
 	POWER_SUPPLY_PROP_POWER_NOW,
 	POWER_SUPPLY_PROP_REAL_TYPE,
 	POWER_SUPPLY_PROP_TYPEC_MODE,
-	POWER_SUPPLY_PROP_INPUT_CURRENT_NOW,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED,
 	POWER_SUPPLY_PROP_HVDCP3_TYPE,
 	POWER_SUPPLY_PROP_HVDCP_OPTI_ALLOWED,
@@ -1423,11 +1420,6 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 		else
 			val->intval = chg->typec_mode;
 		break;
-	case POWER_SUPPLY_PROP_QUICK_CHARGE_TYPE:
-		rc = smb5_iio_get_prop(chg, PSY_IIO_QUICK_CHARGE_TYPE,
-					&val->intval);
-		break;
-	case POWER_SUPPLY_PROP_INPUT_CURRENT_NOW:
 	case POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED:
 	case POWER_SUPPLY_PROP_HVDCP3_TYPE:
 	case POWER_SUPPLY_PROP_HVDCP_OPTI_ALLOWED:
@@ -2017,9 +2009,6 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_TIME_TO_FULL_NOW:
 		rc = smblib_get_prop_from_bms(chg,
 				SMB5_QG_TIME_TO_FULL_NOW, &pval->intval);
-		break;
-	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
-		rc = smblib_get_prop_batt_capacity_level(chg, pval);
 		break;
 	case POWER_SUPPLY_PROP_CHARGING_ENABLED:
 		pval->intval = !get_effective_result(chg->chg_disable_votable);
