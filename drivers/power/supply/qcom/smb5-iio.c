@@ -468,7 +468,10 @@ int smb5_iio_get_prop(struct smb_charger *chg, int channel, int *val)
 	}
 
 	if (rc < 0) {
-		pr_err("Couldn't get prop %d rc = %d\n", channel, rc);
+		if (rc == -ENODATA)
+			pr_debug("prop %d has no data yet\n", channel);
+		else
+			pr_err("Couldn't get prop %d rc = %d\n", channel, rc);
 		return rc;
 	}
 
