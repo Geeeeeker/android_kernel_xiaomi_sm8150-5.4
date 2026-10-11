@@ -228,6 +228,8 @@
 		reset-names = "pcie_0_core_reset",
 				"pcie_0_phy_reset";
 
+		status = "disabled";
+
 		pcie_rc0: pcie_rc0 {
 			#address-cells = <5>;
 			#size-cells = <0>;
@@ -546,6 +548,8 @@
 
 		reset-names = "pcie_1_core_reset",
 				"pcie_1_phy_reset";
+
+		status = "disabled";
 
 		pcie_rc1: pcie_rc1 {
 			#address-cells = <5>;

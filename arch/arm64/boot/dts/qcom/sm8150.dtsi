@@ -1057,6 +1057,7 @@
 		compatible = "qcom,devfreq-icc-ddr";
 		governor = "bw_hwmon";
 		interconnects = <&compute_noc MASTER_NPU &mc_virt SLAVE_EBI1>;
+		qcom,active-only;
 		operating-points-v2 = <&ddr_bw_opp_table>;
 	};
 
