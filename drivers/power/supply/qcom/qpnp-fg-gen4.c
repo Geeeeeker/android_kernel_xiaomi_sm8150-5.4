@@ -4641,6 +4641,8 @@ static int fg_psy_get_property(struct power_supply *psy,
 		rc = get_cycle_count(chip->counter, &pval->intval);
 		break;
 	case POWER_SUPPLY_PROP_SOH:
+		if (chip->soh < 0)
+			return -ENODATA;
 		pval->intval = chip->soh;
 		break;
 	default:
