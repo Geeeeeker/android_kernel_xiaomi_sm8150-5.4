@@ -25,6 +25,14 @@ And public attribution of xiaomi platforms(like F1 and so and)
 	qcom,fg-empty-voltage = <3100>;
 	qcom,fg-batt-temp-delta = <6>;
 	qcom,fg-force-load-profile;
+	/*
+	 * Capacity learning may lower the learned capacity by up to 30 % per
+	 * full charge (driver default 10 %). An aged cell well below the
+	 * profile's 3979 mAh otherwise takes half a dozen 15 %-to-full cycles
+	 * before the reported level stops running far ahead of the real charge
+	 * (seen: "34 %" at 3.3 V under load, then an empty-battery shutdown).
+	 */
+	qcom,cl-max-decrement = <300>;
 	qcom,five-pin-battery;
 	/* ESR fast calibration */
 	qcom,fg-esr-timer-chg-fast = <0 7>;
