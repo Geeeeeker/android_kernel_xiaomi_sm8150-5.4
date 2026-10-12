@@ -105,6 +105,11 @@
 #define CC_MODE_VOTER		"CC_MODE_VOTER"
 #define MAIN_DISABLE_VOTER	"MAIN_DISABLE_VOTER"
 #define TAPER_MAIN_ICL_LIMIT_VOTER	"TAPER_MAIN_ICL_LIMIT_VOTER"
+#define VBAT_GUARD_VOTER	"VBAT_GUARD_VOTER"
+
+/* Stop the charge pump this far below the float voltage */
+#define VBAT_GUARD_MARGIN_UV	50000
+#define VBAT_GUARD_POLL_MS	500
 
 #define CP_MASTER		0
 #define CP_SLAVE		1
@@ -176,6 +181,7 @@ struct smb1390 {
 	/* work structs */
 	struct work_struct	status_change_work;
 	struct work_struct	taper_work;
+	struct delayed_work	vbat_guard_work;
 
 	/* mutexes */
 	spinlock_t		status_change_lock;
@@ -1005,6 +1011,12 @@ static int smb1390_disable_vote_cb(struct votable *votable, void *data,
 		power_supply_changed(chip->cp_master_psy);
 
 	chip->disabled = disable;
+
+	if (disable)
+		cancel_delayed_work(&chip->vbat_guard_work);
+	else
+		mod_delayed_work(system_wq, &chip->vbat_guard_work, 0);
+
 	return rc;
 }
 
@@ -1311,6 +1323,7 @@ static void smb1390_status_change_work(struct work_struct *work)
 		vote(chip->slave_disable_votable, SRC_VOTER, true, 0);
 		vote(chip->disable_votable, SRC_VOTER, true, 0);
 		vote(chip->disable_votable, TAPER_END_VOTER, false, 0);
+		vote(chip->disable_votable, VBAT_GUARD_VOTER, false, 0);
 		vote(chip->fcc_votable, CP_VOTER, false, 0);
 		vote(chip->disable_votable, SOC_LEVEL_VOTER, true, 0);
 		vote_override(chip->ilim_votable, CC_MODE_VOTER, false, 0);
@@ -1324,6 +1337,48 @@ static void smb1390_status_change_work(struct work_struct *work)
 out:
 	pm_relax(chip->dev);
 	chip->status_change_running = false;
+}
+
+/*
+ * The charge pump has no voltage loop of its own: its current is set by the
+ * adapter (PPS/QC3), which hvdcp_opti steps from userspace, and the taper
+ * work only starts reducing FCC once the main charger is already in float.
+ * On a battery with a high ESR, 2 A from the charge pump lifts the battery
+ * terminal voltage well past the float voltage before that happens (seen:
+ * 4.65 V with a 4.4 V float, ending in a battery OV shutdown). Watch VBAT
+ * while the charge pump switches and hand charging back to the main charger
+ * before it reaches the float voltage. The vote is kept until the charge
+ * pump source goes away, so the charge pump doesn't cycle as VBAT relaxes.
+ */
+static void smb1390_vbat_guard_work(struct work_struct *work)
+{
+	struct smb1390 *chip = container_of(work, struct smb1390,
+					    vbat_guard_work.work);
+	union power_supply_propval pval = {0, };
+	int rc, fv_uv;
+
+	if (!is_psy_voter_available(chip) || chip->disabled)
+		return;
+
+	fv_uv = get_effective_result(chip->fv_votable);
+	rc = power_supply_get_property(chip->batt_psy,
+				       POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
+	if (rc < 0 || fv_uv <= 0) {
+		pr_err_ratelimited("Couldn't read VBAT/FV for the guard rc=%d fv=%d\n",
+		       rc, fv_uv);
+		goto resched;
+	}
+
+	if (pval.intval >= fv_uv - VBAT_GUARD_MARGIN_UV) {
+		pr_info("VBAT %duV near float %duV, disabling charge pump\n",
+			pval.intval, fv_uv);
+		vote(chip->disable_votable, VBAT_GUARD_VOTER, true, 0);
+		return;
+	}
+
+resched:
+	schedule_delayed_work(&chip->vbat_guard_work,
+			      msecs_to_jiffies(VBAT_GUARD_POLL_MS));
 }
 
 static int smb1390_validate_slave_chg_taper(struct smb1390 *chip, int fcc_uA)
@@ -1881,6 +1936,7 @@ static int smb1390_master_probe(struct smb1390 *chip)
 
 	INIT_WORK(&chip->status_change_work, smb1390_status_change_work);
 	INIT_WORK(&chip->taper_work, smb1390_taper_work);
+	INIT_DELAYED_WORK(&chip->vbat_guard_work, smb1390_vbat_guard_work);
 
 	rc = smb1390_init_hw(chip);
 	if (rc < 0) {
@@ -1932,6 +1988,7 @@ out_votables:
 out_work:
 	cancel_work_sync(&chip->taper_work);
 	cancel_work_sync(&chip->status_change_work);
+	cancel_delayed_work_sync(&chip->vbat_guard_work);
 	wakeup_source_unregister(chip->cp_ws);
 	return rc;
 }
@@ -2519,6 +2576,7 @@ static int smb1390_remove(struct platform_device *pdev)
 	vote(chip->disable_votable, SOC_LEVEL_VOTER, true, 0);
 	cancel_work_sync(&chip->taper_work);
 	cancel_work_sync(&chip->status_change_work);
+	cancel_delayed_work_sync(&chip->vbat_guard_work);
 	wakeup_source_unregister(chip->cp_ws);
 	smb1390_destroy_votables(chip);
 	smb1390_release_channels(chip);
