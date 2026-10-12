@@ -1437,7 +1437,64 @@ out:
 
 static enum power_supply_property smb1390_charge_pump_props[] = {
 	POWER_SUPPLY_PROP_MODEL_NAME,
+	POWER_SUPPLY_PROP_CP_STATUS1,
+	POWER_SUPPLY_PROP_CP_STATUS2,
+	POWER_SUPPLY_PROP_CP_ENABLE,
+	POWER_SUPPLY_PROP_CP_SWITCHER_EN,
+	POWER_SUPPLY_PROP_CP_DIE_TEMP,
+	POWER_SUPPLY_PROP_CP_ISNS,
+	POWER_SUPPLY_PROP_CP_ISNS_SLAVE,
+	POWER_SUPPLY_PROP_CP_TOGGLE_SWITCHER,
+	POWER_SUPPLY_PROP_CP_IRQ_STATUS,
+	POWER_SUPPLY_PROP_CP_ILIM,
+	POWER_SUPPLY_PROP_CHIP_VERSION,
+	POWER_SUPPLY_PROP_PARALLEL_MODE,
+	POWER_SUPPLY_PROP_PARALLEL_OUTPUT_MODE,
+	POWER_SUPPLY_PROP_MIN_ICL,
 };
+
+static int cp_master_iio_get_prop(struct smb1390 *chip, int channel, int *val);
+static int cp_master_iio_set_prop(struct smb1390 *chip, int channel, int val);
+
+/*
+ * hvdcp_opti uses the power supply path when charge_pump_master exists and
+ * reads/writes these legacy properties; serve them from the IIO handlers.
+ */
+static int smb1390_psy_iio_channel(enum power_supply_property prop)
+{
+	switch (prop) {
+	case POWER_SUPPLY_PROP_CP_STATUS1:
+		return PSY_IIO_CP_STATUS1;
+	case POWER_SUPPLY_PROP_CP_STATUS2:
+		return PSY_IIO_CP_STATUS2;
+	case POWER_SUPPLY_PROP_CP_ENABLE:
+		return PSY_IIO_CP_ENABLE;
+	case POWER_SUPPLY_PROP_CP_SWITCHER_EN:
+		return PSY_IIO_CP_SWITCHER_EN;
+	case POWER_SUPPLY_PROP_CP_DIE_TEMP:
+		return PSY_IIO_CP_DIE_TEMP;
+	case POWER_SUPPLY_PROP_CP_ISNS:
+		return PSY_IIO_CP_ISNS;
+	case POWER_SUPPLY_PROP_CP_ISNS_SLAVE:
+		return PSY_IIO_CP_ISNS_SLAVE;
+	case POWER_SUPPLY_PROP_CP_TOGGLE_SWITCHER:
+		return PSY_IIO_CP_TOGGLE_SWITCHER;
+	case POWER_SUPPLY_PROP_CP_IRQ_STATUS:
+		return PSY_IIO_IRQ_STATUS;
+	case POWER_SUPPLY_PROP_CP_ILIM:
+		return PSY_IIO_CP_ILIM;
+	case POWER_SUPPLY_PROP_CHIP_VERSION:
+		return PSY_IIO_CHIP_VERSION;
+	case POWER_SUPPLY_PROP_PARALLEL_MODE:
+		return PSY_IIO_PARALLEL_MODE;
+	case POWER_SUPPLY_PROP_PARALLEL_OUTPUT_MODE:
+		return PSY_IIO_PARALLEL_OUTPUT_MODE;
+	case POWER_SUPPLY_PROP_MIN_ICL:
+		return PSY_IIO_MIN_ICL;
+	default:
+		return -EINVAL;
+	}
+}
 
 static int smb1390_get_prop(struct power_supply *psy,
 			enum power_supply_property prop,
@@ -1445,17 +1502,50 @@ static int smb1390_get_prop(struct power_supply *psy,
 {
 	struct smb1390 *chip = power_supply_get_drvdata(psy);
 
+	int channel;
+
 	switch (prop) {
 	case POWER_SUPPLY_PROP_MODEL_NAME:
 		val->strval = (chip->rev4 > 2) ? "SMB1390_V3" : "SMB1390_V2";
 		break;
 	default:
-		smb1390_dbg(chip, PR_MISC, "charge pump power supply get prop %d not supported\n",
-			prop);
-		return -EINVAL;
+		channel = smb1390_psy_iio_channel(prop);
+		if (channel < 0) {
+			smb1390_dbg(chip, PR_MISC, "charge pump power supply get prop %d not supported\n",
+				prop);
+			return -EINVAL;
+		}
+		return cp_master_iio_get_prop(chip, channel, &val->intval);
 	}
 
 	return 0;
+}
+
+static int smb1390_set_prop(struct power_supply *psy,
+			enum power_supply_property prop,
+			const union power_supply_propval *val)
+{
+	struct smb1390 *chip = power_supply_get_drvdata(psy);
+	int channel = smb1390_psy_iio_channel(prop);
+
+	if (channel < 0)
+		return -EINVAL;
+
+	return cp_master_iio_set_prop(chip, channel, val->intval);
+}
+
+static int smb1390_prop_is_writeable(struct power_supply *psy,
+			enum power_supply_property prop)
+{
+	switch (prop) {
+	case POWER_SUPPLY_PROP_CP_ENABLE:
+	case POWER_SUPPLY_PROP_CP_TOGGLE_SWITCHER:
+	case POWER_SUPPLY_PROP_CP_IRQ_STATUS:
+	case POWER_SUPPLY_PROP_CP_ILIM:
+		return 1;
+	default:
+		return 0;
+	}
 }
 
 static struct power_supply_desc charge_pump_psy_desc = {
@@ -1464,6 +1554,8 @@ static struct power_supply_desc charge_pump_psy_desc = {
 	.properties		= smb1390_charge_pump_props,
 	.num_properties		= ARRAY_SIZE(smb1390_charge_pump_props),
 	.get_property		= smb1390_get_prop,
+	.set_property		= smb1390_set_prop,
+	.property_is_writeable	= smb1390_prop_is_writeable,
 };
 
 static int smb1390_init_charge_pump_psy(struct smb1390 *chip)
@@ -2314,9 +2406,9 @@ static int cp_iio_probe_init(struct smb1390 *chip,
 
 	if (chip->cp_role == CP_MASTER) {
 		cp_smb5_iio_init(chip);
-		indio_dev->name = "smb1390-cp-master";
+		indio_dev->name = "smb1390-div2-cp-master";
 	} else {
-		indio_dev->name = "smb1390-cp-slave";
+		indio_dev->name = "smb1390-div2-cp-slave";
 	}
 
 	indio_dev->info = cp_iio_info;
@@ -2347,7 +2439,7 @@ static int smb1390_probe(struct platform_device *pdev)
 	}
 
 	platform_set_drvdata(pdev, chip);
-	chip->cp_role = (int)of_device_get_match_data(chip->dev);
+	chip->cp_role = (int)(uintptr_t)of_device_get_match_data(chip->dev);
 	switch (chip->cp_role) {
 	case CP_MASTER:
 		chip->nchannels = ARRAY_SIZE(cp_master_chans);

@@ -4607,6 +4607,33 @@ static struct attribute *fg_attrs[] = {
 };
 ATTRIBUTE_GROUPS(fg);
 
+static int fg_gen4_iio_read_raw(struct iio_dev *indio_dev,
+		struct iio_chan_spec const *chan, int *val1,
+		int *val2, long mask);
+
+/* Legacy bms properties read by hvdcp_opti, served by the IIO handler */
+static int fg_psy_iio_channel(enum power_supply_property psp)
+{
+	switch (psp) {
+	case POWER_SUPPLY_PROP_SOC_REPORTING_READY:
+		return PSY_IIO_SOC_REPORTING_READY;
+	case POWER_SUPPLY_PROP_VOLTAGE_OCV:
+		return PSY_IIO_VOLTAGE_OCV;
+	case POWER_SUPPLY_PROP_ESR_ACTUAL:
+		return PSY_IIO_ESR_ACTUAL;
+	case POWER_SUPPLY_PROP_ESR_NOMINAL:
+		return PSY_IIO_ESR_NOMINAL;
+	case POWER_SUPPLY_PROP_RESISTANCE_ID:
+		return PSY_IIO_RESISTANCE_ID;
+	case POWER_SUPPLY_PROP_DEBUG_BATTERY:
+		return PSY_IIO_DEBUG_BATTERY;
+	case POWER_SUPPLY_PROP_CURRENT_AVG:
+		return PSY_IIO_CURRENT_AVG;
+	default:
+		return -EINVAL;
+	}
+}
+
 static int fg_psy_get_property(struct power_supply *psy,
 			       enum power_supply_property psp,
 			       union power_supply_propval *pval)
@@ -4645,12 +4672,45 @@ static int fg_psy_get_property(struct power_supply *psy,
 			return -ENODATA;
 		pval->intval = chip->soh;
 		break;
-	default:
-		rc = -EINVAL;
+	case POWER_SUPPLY_PROP_CALIBRATE:
+		pval->intval = chip->calib_level;
 		break;
+	default: {
+		struct iio_chan_spec chan = { .channel = fg_psy_iio_channel(psp) };
+		int val2;
+
+		if (chan.channel < 0)
+			return -EINVAL;
+		rc = fg_gen4_iio_read_raw(chip->indio_dev, &chan, &pval->intval,
+					  &val2, IIO_CHAN_INFO_PROCESSED);
+		if (rc == IIO_VAL_INT)
+			rc = 0;
+		break;
+	}
 	}
 
 	return rc;
+}
+
+/* hvdcp_opti sets the ADC calibration level through bms/calibrate */
+static int fg_psy_set_property(struct power_supply *psy,
+			       enum power_supply_property psp,
+			       const union power_supply_propval *pval)
+{
+	struct fg_gen4_chip *chip = power_supply_get_drvdata(psy);
+
+	switch (psp) {
+	case POWER_SUPPLY_PROP_CALIBRATE:
+		return fg_gen4_set_calibrate_level(chip, pval->intval);
+	default:
+		return -EINVAL;
+	}
+}
+
+static int fg_property_is_writeable(struct power_supply *psy,
+				    enum power_supply_property psp)
+{
+	return psp == POWER_SUPPLY_PROP_CALIBRATE;
 }
 
 static enum power_supply_property fg_psy_props[] = {
@@ -4660,6 +4720,14 @@ static enum power_supply_property fg_psy_props[] = {
 	POWER_SUPPLY_PROP_RESISTANCE,
 	POWER_SUPPLY_PROP_CYCLE_COUNT,
 	POWER_SUPPLY_PROP_SOH,
+	POWER_SUPPLY_PROP_CALIBRATE,
+	POWER_SUPPLY_PROP_SOC_REPORTING_READY,
+	POWER_SUPPLY_PROP_VOLTAGE_OCV,
+	POWER_SUPPLY_PROP_ESR_ACTUAL,
+	POWER_SUPPLY_PROP_ESR_NOMINAL,
+	POWER_SUPPLY_PROP_RESISTANCE_ID,
+	POWER_SUPPLY_PROP_DEBUG_BATTERY,
+	POWER_SUPPLY_PROP_CURRENT_AVG,
 };
 
 static const struct power_supply_desc fg_psy_desc = {
@@ -4668,6 +4736,8 @@ static const struct power_supply_desc fg_psy_desc = {
 	.properties = fg_psy_props,
 	.num_properties = ARRAY_SIZE(fg_psy_props),
 	.get_property = fg_psy_get_property,
+	.set_property = fg_psy_set_property,
+	.property_is_writeable = fg_property_is_writeable,
 };
 
 /* IIO CHANNELS XIAOMI */
