@@ -950,10 +950,15 @@ static int pd_select_pdo(struct usbpd *pd, int pdo_pos, int uv, int ua)
 		}
 #endif
 
-		/* Never ask the adapter for more than the input can take */
+		/*
+		 * Never ask the adapter for more than the input can take.
+		 * hvdcp_opti retries the capped request ~20 times a second, so
+		 * log the cap once per contract.
+		 */
 		if (uv > pd->pd_vbus_max_limit) {
-			usbpd_info(&pd->dev, "PPS request %d uV capped to %d uV\n",
-					uv, pd->pd_vbus_max_limit);
+			if (pd->requested_voltage != pd->pd_vbus_max_limit)
+				usbpd_info(&pd->dev, "PPS request %d uV capped to %d uV\n",
+						uv, pd->pd_vbus_max_limit);
 			uv = pd->pd_vbus_max_limit;
 		}
 #if defined(CONFIG_MACH_XIAOMI_VAYU)
@@ -1051,10 +1056,15 @@ static int pd_select_pdo_for_bq(struct usbpd *pd, int pdo_pos, int uv, int ua)
 			return -EINVAL;
 		}
 
-		/* Never ask the adapter for more than the input can take */
+		/*
+		 * Never ask the adapter for more than the input can take.
+		 * hvdcp_opti retries the capped request ~20 times a second, so
+		 * log the cap once per contract.
+		 */
 		if (uv > pd->pd_vbus_max_limit) {
-			usbpd_info(&pd->dev, "PPS request %d uV capped to %d uV\n",
-					uv, pd->pd_vbus_max_limit);
+			if (pd->requested_voltage != pd->pd_vbus_max_limit)
+				usbpd_info(&pd->dev, "PPS request %d uV capped to %d uV\n",
+						uv, pd->pd_vbus_max_limit);
 			uv = pd->pd_vbus_max_limit;
 		}
 
