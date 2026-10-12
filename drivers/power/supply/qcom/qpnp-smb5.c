@@ -1223,6 +1223,18 @@ static const char *smb5_get_usb_type_name(int type)
 static int smb5_psy_iio_channel(enum power_supply_property psp)
 {
 	switch (psp) {
+	case POWER_SUPPLY_PROP_USB_PD_ACTIVE:
+		return PSY_IIO_PD_ACTIVE;
+	case POWER_SUPPLY_PROP_CHARGER_STATUS:
+		return PSY_IIO_CHARGER_STATUS;
+	case POWER_SUPPLY_PROP_SKIN_HEALTH:
+		return PSY_IIO_SKIN_HEALTH;
+	case POWER_SUPPLY_PROP_CTM_CURRENT_MAX:
+		return PSY_IIO_CTM_CURRENT_MAX;
+	case POWER_SUPPLY_PROP_APSD_RERUN:
+		return PSY_IIO_APSD_RERUN;
+	case POWER_SUPPLY_PROP_APSD_TIMEOUT:
+		return PSY_IIO_APSD_TIMEOUT;
 	case POWER_SUPPLY_PROP_HVDCP3_TYPE:
 		return PSY_IIO_HVDCP3_TYPE;
 	case POWER_SUPPLY_PROP_HVDCP_OPTI_ALLOWED:
@@ -1348,6 +1360,12 @@ static enum power_supply_property smb5_usb_props[] = {
 	POWER_SUPPLY_PROP_HW_CURRENT_MAX,
 	POWER_SUPPLY_PROP_VOLTAGE_MAX_LIMIT,
 	POWER_SUPPLY_PROP_CONNECTOR_HEALTH,
+	POWER_SUPPLY_PROP_USB_PD_ACTIVE,
+	POWER_SUPPLY_PROP_CHARGER_STATUS,
+	POWER_SUPPLY_PROP_SKIN_HEALTH,
+	POWER_SUPPLY_PROP_CTM_CURRENT_MAX,
+	POWER_SUPPLY_PROP_APSD_RERUN,
+	POWER_SUPPLY_PROP_APSD_TIMEOUT,
 };
 
 static int smb5_usb_get_prop(struct power_supply *psy,
@@ -1433,6 +1451,12 @@ static int smb5_usb_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_HW_CURRENT_MAX:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_LIMIT:
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
+	case POWER_SUPPLY_PROP_USB_PD_ACTIVE:
+	case POWER_SUPPLY_PROP_CHARGER_STATUS:
+	case POWER_SUPPLY_PROP_SKIN_HEALTH:
+	case POWER_SUPPLY_PROP_CTM_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_APSD_RERUN:
+	case POWER_SUPPLY_PROP_APSD_TIMEOUT:
 		rc = smb5_psy_get_iio_prop(chg, psp, val);
 		break;
 	default:
@@ -1468,6 +1492,8 @@ static int smb5_usb_set_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_THERM_ICL_LIMIT:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_LIMIT:
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
+	case POWER_SUPPLY_PROP_CTM_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_APSD_RERUN:
 		rc = smb5_iio_set_prop(chg, smb5_psy_iio_channel(psp),
 					val->intval);
 		break;
@@ -1491,6 +1517,8 @@ static int smb5_usb_prop_is_writeable(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_THERM_ICL_LIMIT:
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX_LIMIT:
 	case POWER_SUPPLY_PROP_CONNECTOR_HEALTH:
+	case POWER_SUPPLY_PROP_CTM_CURRENT_MAX:
+	case POWER_SUPPLY_PROP_APSD_RERUN:
 		return 1;
 	default:
 		break;
