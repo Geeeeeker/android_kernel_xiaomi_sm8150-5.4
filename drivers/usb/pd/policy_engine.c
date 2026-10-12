@@ -948,8 +948,15 @@ static int pd_select_pdo(struct usbpd *pd, int pdo_pos, int uv, int ua)
 				"PPS is controlled by ourself, return not support\n");
 			return -ENOTSUPP;
 		}
+#endif
 
-		/* if limit_pd_vbus is enabled, pd request uv will less than pd vbus max */
+		/* Never ask the adapter for more than the input can take */
+		if (uv > pd->pd_vbus_max_limit) {
+			usbpd_info(&pd->dev, "PPS request %d uV capped to %d uV\n",
+					uv, pd->pd_vbus_max_limit);
+			uv = pd->pd_vbus_max_limit;
+		}
+#if defined(CONFIG_MACH_XIAOMI_VAYU)
 		if (pd->limit_curr && ua > pd->pd_max_curr_limit) {
 			ua = pd->pd_max_curr_limit;
 		}
@@ -1044,7 +1051,13 @@ static int pd_select_pdo_for_bq(struct usbpd *pd, int pdo_pos, int uv, int ua)
 			return -EINVAL;
 		}
 
-		/* if limit_pd_vbus is enabled, pd request uv will less than pd vbus max */
+		/* Never ask the adapter for more than the input can take */
+		if (uv > pd->pd_vbus_max_limit) {
+			usbpd_info(&pd->dev, "PPS request %d uV capped to %d uV\n",
+					uv, pd->pd_vbus_max_limit);
+			uv = pd->pd_vbus_max_limit;
+		}
+
 		if (pd->limit_curr && ua > pd->pd_max_curr_limit) {
 			ua = pd->pd_max_curr_limit;
 		}
@@ -5577,10 +5590,17 @@ struct usbpd *usbpd_create(struct device *parent,
 	ret = of_property_read_u32(parent->of_node, "mi,limit_pd_vbus",
 			&pd->limit_pd_vbus);
 	if (ret) {
-		usbpd_err(&pd->dev, "failed to read pd vbus limit\n");
+		usbpd_dbg(&pd->dev, "no pd vbus limit in DT\n");
 		pd->limit_pd_vbus = false;
 	}
 
+	/*
+	 * PPS requests are capped at pd_vbus_max_limit (below). Without a DT
+	 * override that is the same 9 V the fixed-PDO path already enforces:
+	 * the PMIC input collapses well before 12 V, and the SMB1390 charge
+	 * pump never needs more than twice the battery voltage.
+	 */
+	pd->pd_vbus_max_limit = PD_VBUS_MAX_VOLTAGE_LIMIT;
 	if (pd->limit_pd_vbus) {
 		ret = of_property_read_u32(parent->of_node, "mi,pd_vbus_max_limit",
 				&pd->pd_vbus_max_limit);
