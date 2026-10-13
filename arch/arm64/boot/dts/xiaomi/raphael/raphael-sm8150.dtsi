@@ -33,6 +33,17 @@ And public attribution of xiaomi platforms(like F1 and so and)
 	 * (seen: "34 %" at 3.3 V under load, then an empty-battery shutdown).
 	 */
 	qcom,cl-max-decrement = <300>;
+	/*
+	 * The driver only opens a learning session while the filtered battery
+	 * current is within 100 mA of zero, i.e. in the instant between the
+	 * charger being plugged in and the current ramping up. A phone that
+	 * boots with the charger attached, or is plugged in while the screen
+	 * is on, charges at >1 A before the check runs and never learns
+	 * (whole 6 %-to-full Anker cycle: no session, charge_full unchanged).
+	 * 0 disables the check, as the 4.14 driver this profile was tuned on
+	 * had no such gate.
+	 */
+	qcom,cl-ibat-flt-thresh-ma = <0>;
 	qcom,five-pin-battery;
 	/* ESR fast calibration */
 	qcom,fg-esr-timer-chg-fast = <0 7>;
