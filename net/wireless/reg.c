@@ -1059,9 +1059,27 @@ static void regdb_fw_cb(const struct firmware *fw, void *context)
 	release_firmware(fw);
 }
 
+struct regdb_load_req {
+	struct work_struct work;
+	void *alpha2;
+};
+
+static void regdb_load_work(struct work_struct *work)
+{
+	struct regdb_load_req *req = container_of(work, struct regdb_load_req,
+						  work);
+	const struct firmware *fw;
+
+	if (request_firmware_direct(&fw, "regulatory.db", &reg_pdev->dev))
+		fw = NULL;
+
+	regdb_fw_cb(fw, req->alpha2);
+	kfree(req);
+}
+
 static int query_regdb_file(const char *alpha2)
 {
-	int err;
+	struct regdb_load_req *req;
 
 	ASSERT_RTNL();
 
@@ -1072,13 +1090,24 @@ static int query_regdb_file(const char *alpha2)
 	if (!alpha2)
 		return -ENOMEM;
 
-	err = request_firmware_nowait(THIS_MODULE, true, "regulatory.db",
-				      &reg_pdev->dev, GFP_KERNEL,
-				      (void *)alpha2, regdb_fw_cb);
-	if (err)
+	/*
+	 * Look regulatory.db up directly, without the firmware loader's
+	 * user-helper fallback. With FW_LOADER_USER_HELPER_FALLBACK the
+	 * request otherwise sits in sysfs until Android's ueventd answers
+	 * (2 s -> 6.6 s into boot), only to fail the same way. Still
+	 * asynchronous, and regdb_fw_cb() handles the result as before.
+	 */
+	req = kmalloc(sizeof(*req), GFP_KERNEL);
+	if (!req) {
 		kfree(alpha2);
+		return -ENOMEM;
+	}
 
-	return err;
+	req->alpha2 = (void *)alpha2;
+	INIT_WORK(&req->work, regdb_load_work);
+	schedule_work(&req->work);
+
+	return 0;
 }
 
 int reg_reload_regdb(void)
