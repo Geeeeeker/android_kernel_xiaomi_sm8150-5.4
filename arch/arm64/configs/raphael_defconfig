@@ -1,3 +1,4 @@
+CONFIG_USB_DWC2_DUAL_ROLE=y
 # ====== 开启 zstd 内存压缩（ZRAM 使用 zstd） ======
 CONFIG_ZRAM=y
 CONFIG_ZRAM_DEF_COMP_ZSTD=y
