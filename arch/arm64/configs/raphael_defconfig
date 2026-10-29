@@ -45,7 +45,7 @@ CONFIG_DTS_EAGLE=y
 CONFIG_DTS_SRS_TM=y
 
 # ====== 内核信息 ======
-CONFIG_LOCALVERSION="-qgki_RaphGhost&Geeeeeker"
+CONFIG_LOCALVERSION="-qgki_RaphGhost_Geeeeeker"
 
 # Platform
 CONFIG_MACH_XIAOMI_RAPHAEL=y
