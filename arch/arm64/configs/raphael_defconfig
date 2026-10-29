@@ -45,7 +45,7 @@ CONFIG_DTS_EAGLE=y
 CONFIG_DTS_SRS_TM=y
 
 # ====== 内核信息 ======
-CONFIG_LOCALVERSION=" Geeeeeker-perf"
+CONFIG_LOCALVERSION="-qgki_RaphGhost&Geeeeeker"
 
 # Platform
 CONFIG_MACH_XIAOMI_RAPHAEL=y
@@ -67,7 +67,7 @@ CONFIG_SND_SOC_TFA9874_FOR_DAVI=y
 # vendor/sm8150-qgki_defconfig; this fragment is merged after it. The kernel
 # is monolithic here (no .ko anywhere, no /vendor/lib/modules), so the
 # version string is cosmetic and moving it breaks nothing.
-CONFIG_LOCALVERSION="-RaphGhost"
+
 
 # hvdcp_opti finds the SMB1390 through IIO only with the PSY driver
 # CONFIG_SMB1390_CHARGE_PUMP is not set
@@ -137,7 +137,7 @@ CONFIG_QCOM_WATCHDOG_PET_TIME=15000
 
 
 CONFIG_UAPI_HEADER_TEST=y
-CONFIG_LOCALVERSION="-qgki_aman"
+
 CONFIG_AUDIT=y
 CONFIG_PRINT_SUSPEND_EPOCH_QGKI=y
 CONFIG_NO_HZ=y
